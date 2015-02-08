@@ -8,6 +8,8 @@
    private double userInfluence;
    private double semanticClassification;
    private double classificationConfidence;
+   private String sentiment;
+   private String normText;
    private Date creationDate;
    private Date lastUpdateDate;
    
@@ -69,8 +71,20 @@
      result = df.format(getSemanticClassification());
      return result;
    }
+
+	public String getSentiment() {
+		return sentiment;
+	}
+
+	public void setSentiment(String sentiment) {
+		this.sentiment = sentiment;
+	}
+
+	public String getNormText() {
+		return normText;
+	}
+
+	public void setNormText(String normText) {
+		this.normText = normText;
+	}
  }
-
-
-
-

@@ -1,14 +1,24 @@
  package socialeyser.bl.services.impl;
  
- import java.io.IOException;
- import java.util.Random;
- import javax.annotation.PostConstruct;
- import org.slf4j.Logger;
- import org.slf4j.LoggerFactory;
- import socialeyser.bl.services.impl.sa.modsupport.Analysis;
- import socialeyser.bl.services.interfaces.SentimentClassifier;
- import socialeyser.model.Enrichment;
- import socialeyser.model.Message;
+ import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
+import java.util.Properties;
+import java.util.Random;
+import java.util.Set;
+
+import javax.annotation.PostConstruct;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import socialeyser.bl.services.impl.sa.modsupport.MessageSets;
+import socialeyser.bl.services.impl.sa.modsupport.MyClassifier;
+import socialeyser.bl.services.impl.sa.modsupport.MyTrainer;
+import socialeyser.bl.services.interfaces.SentimentClassifier;
+import socialeyser.model.Enrichment;
+import socialeyser.model.Message;
+import weka.classifiers.meta.FilteredClassifier;
  
  public class SentimentClassifierImpl
    implements SentimentClassifier
@@ -17,46 +27,25 @@
    static final int POSITIVE = 1;
    static final int NEGATIVE = -1;
    static final int NEUTRAL = 0;
-   private Analysis analysis;
-   
-   @PostConstruct
-   public void init()
+      
+   public Message classifyMessage(Message message, Set<Message> trainingSet) throws Exception
    {
-     log.info("started parsing dictionary");
-     this.analysis = new Analysis();
-     log.info("done parsing file");
-   }
-   
-   public Message classifyMessage(Message message)
-   {
-     Random rand = new Random();
-     
-     double classifyresult = rand.nextDouble();
-     int evaluation;
-     
-     if (classifyresult < 0.33D)
-     {
-       evaluation = 1;
-     }
-     else
-     {
-       
-       if (classifyresult < 0.66D) {
-         evaluation = -1;
-       } else {
-         evaluation = 0;
-       }
-     }
-     try
-     {
-       message.getEnrichment().setSemanticClassification(this.analysis.sentiment(message));
-     }
-     catch (IOException e)
-     {
-       e.printStackTrace();
-       throw new RuntimeException(e);
-     }
-     return message;
+	   String[] classList = {"positive", "negative", "neutral"};
+	   Properties prop = new Properties();
+	   prop.load(new FileReader(new File("etc/conf/wekaClassifier.properties")));
+	   
+	   Set<Message> normTraining = MessageSets.normalizedSet(trainingSet, prop);
+	   
+	   MyTrainer tr = new MyTrainer(normTraining, classList);
+	   FilteredClassifier model = tr.train();
+	   MyClassifier cl = new MyClassifier(model, classList, "neutral");
+	   
+	   Message normMessage = MessageSets.normalizedMess(message, prop);
+	   String sentiment = cl.classifyTweet(normMessage);
+	   
+	   normMessage.getEnrichment().setSentiment(sentiment);
+	   
+	   return normMessage;
    }
    
    private int scaleResult(double sentiment)

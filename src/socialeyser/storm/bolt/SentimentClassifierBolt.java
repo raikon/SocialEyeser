@@ -1,23 +1,27 @@
  package socialeyser.storm.bolt;
  
  import backtype.storm.task.OutputCollector;
- import backtype.storm.task.TopologyContext;
- import backtype.storm.topology.OutputFieldsDeclarer;
- import backtype.storm.topology.base.BaseRichBolt;
- import backtype.storm.tuple.Fields;
- import backtype.storm.tuple.Tuple;
- import backtype.storm.tuple.Values;
- import java.util.Map;
- import org.slf4j.Logger;
- import org.slf4j.LoggerFactory;
- import org.springframework.context.support.ClassPathXmlApplicationContext;
- import socialeyser.bl.services.interfaces.PersistenceService;
- import socialeyser.bl.services.interfaces.SentimentClassifier;
- import socialeyser.bl.services.interfaces.WebAppRequestGateway;
- import socialeyser.model.Enrichment;
- import socialeyser.model.Message;
- import socialeyser.model.RawMessage;
- import socialeyser.model.exception.PersistenceException;
+import backtype.storm.task.TopologyContext;
+import backtype.storm.topology.OutputFieldsDeclarer;
+import backtype.storm.topology.base.BaseRichBolt;
+import backtype.storm.tuple.Fields;
+import backtype.storm.tuple.Tuple;
+import backtype.storm.tuple.Values;
+
+import java.util.Map;
+import java.util.Set;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.context.support.ClassPathXmlApplicationContext;
+
+import socialeyser.bl.services.interfaces.PersistenceService;
+import socialeyser.bl.services.interfaces.SentimentClassifier;
+import socialeyser.bl.services.interfaces.WebAppRequestGateway;
+import socialeyser.model.Enrichment;
+import socialeyser.model.Message;
+import socialeyser.model.RawMessage;
+import socialeyser.model.exception.PersistenceException;
  
  public class SentimentClassifierBolt
    extends BaseRichBolt
@@ -31,6 +35,8 @@
    private WebAppRequestGateway webAppRequestGateway;
    private String errorStreamId;
    private String springContextFileName;
+   //Campo che contiene l'insieme di addestramento: va settato esternamente con l'apposito metodo setter
+   private Set<Message> trainingSet;
    
    public SentimentClassifierBolt(String errorstreamid, String springContextFileName)
    {
@@ -42,11 +48,17 @@
    {
      Message message = (Message)tuple.getValueByField("message");
      
-     message = this.classifier.classifyMessage(message);
+     try {
+    	 message = this.classifier.classifyMessage(message, this.trainingSet);
+     }
+     catch (Exception e) {
+    	 logger.info("Classification error");
+    	 e.printStackTrace();
+     }
      
      logger.info(message.getRawMessage().getTweetText());
      logger.info("user influence:" + message.getEnrichment().getUserInfluence());
-     logger.info("semantic classification:" + message.getEnrichment().getSemanticClassification());
+     logger.info("sentiment predicted:" + message.getEnrichment().getSentiment());
      try
      {
        getPersistenceService().writeMessage(message);
@@ -132,8 +144,13 @@
    {
      this.springContextFileName = springContextFileName;
    }
+
+	public Set<Message> getTrainingSet() {
+		return trainingSet;
+	}
+	
+	public void setTrainingSet(Set<Message> trainingSet) {
+		this.trainingSet = trainingSet;
+	}
+   
  }
-
-
-
-
